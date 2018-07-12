@@ -43,11 +43,8 @@ model.add(generator)
 model.add(discriminator)
 model.compile(loss='binary_crossentropy', optimizer=optimizer)
 
-if os.path.isfile('generator.h5') and os.path.isfile('discriminator.h5') and os.path.isfile('gan.h5'):
-
+if os.path.isfile('generator.h5'):
     generator.load_weights("generator.h5")
-    discriminator.load_weights("discriminator.h5")
-    model.load_weights("gan.h5")
 else:
 
     ones = numpy.ones((32, 1))
@@ -83,8 +80,6 @@ else:
             plt.close()
 
     generator.save_weights("generator.h5")
-    discriminator.save_weights("discriminator.h5")
-    model.save_weights("gan.h5")
 
 noise = numpy.random.normal(0, 1, (25, 100))
 images = generator.predict(noise)
