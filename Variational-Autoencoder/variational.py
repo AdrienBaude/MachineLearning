@@ -1,7 +1,7 @@
 # Reference https://wiseodd.github.io/techblog/2016/12/10/variational-autoencoder/
 
 from keras.layers import Input, Dense, Lambda
-from keras.models import Model, Sequential
+from keras.models import Model
 import keras.backend as K
 from keras.datasets import mnist
 from matplotlib import pyplot as plt
