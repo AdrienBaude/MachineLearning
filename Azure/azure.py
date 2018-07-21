@@ -95,7 +95,7 @@ data = {
 body = str.encode(json.dumps(data))
 
 url = 'https://ussouthcentral.services.azureml.net/workspaces/e681e4c4ae2e46d3a9cdcf56e7427e9f/services/5493c99c695d45a9966eb18f1c7c087b/execute?api-version=2.0&details=true'
-api_key = 'FrgCLZI3MNEZ0mcsAIqmcEkazO7GUOZqfxr9B3/qTLeXEunyPumFKsQBCyJkxrHVbRHwVca8UFv/YFcEPSicLA=='
+api_key = 'KeyHere'
 headers = {'Content-Type': 'application/json', 'Authorization': ('Bearer ' + api_key)}
 
 req = urllib.request.Request(url, body, headers)
