@@ -1,6 +1,6 @@
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Dense, Dropout
+from keras.layers import Dense
 from abc import ABC
 import os.path
 import matplotlib.pyplot as plt
@@ -9,12 +9,14 @@ import matplotlib.pyplot as plt
 class TicTacToe:
     def __init__(self):
         self.state = np.zeros(9)
-        self.player1 = None
-        self.player2 = None
-        self.player = None
+        self.player1 = Player()
+        self.player2 = Player()
+        self.player = Player()
 
     def reset(self):
         self.state = np.zeros(9)
+        self.player1 = Player()
+        self.player2 = Player()
 
     def getState(self):
         if self.player == self.player1:
@@ -61,6 +63,7 @@ class TicTacToe:
         return 0
 
     def game(self, player1, player2):
+
         self.reset()
 
         self.player1 = player1
@@ -68,6 +71,9 @@ class TicTacToe:
 
         self.player1.reward = 0
         self.player2.reward = 0
+
+        self.player1.eps *= 0.999
+        self.player2.eps *= 0.999
 
         self.player = player1
 
@@ -77,42 +83,42 @@ class TicTacToe:
         turnCount = 0
 
         while self.isDone() == 0:
-            self.player1.eps *= 0.999
-            self.player2.eps *= 0.999
-
             choice = self.player.play(self.getState())
-
+            if self.state[choice] != 0:
+                print("Stop after " + str(turnCount) + " turns !")
+                break
             if self.player == self.player1:
                 moves1.append([np.asarray([self.getState()]), choice])
             else:
                 moves2.append([np.asarray([self.getState()]), choice])
             turnCount += 1
             self.play(choice)
-            if self.player1.isHuman or self.player2.isHuman:
-                self.printBoard()
             if self.isDone() == 1:
                 if self.player == self.player1:
-                    print("Player 1 wins !")
+                    print("Player 1 wins in " + str(turnCount) + " turns !")
                     break
                 else:
-                    print("Player 2 wins !")
+                    print("Player 2 wins in " + str(turnCount) + " turns !")
                     break
             elif self.isDone() == 2:
                 print("Draw !")
             self.changeTurn()
+            if self.player1.isHuman or self.player2.isHuman:
+                self.printBoard()
 
         if self.isDone() == 1:
             if self.player == self.player1:
-                self.player1.reward = 10 - turnCount
-                self.player2.reward = -10
+                self.player1.reward = 1
+                self.player2.reward = -1
             else:
-                self.player1.reward = -10
-                self.player2.reward = 10 - turnCount
+                self.player1.reward = -1
+                self.player2.reward = 1
 
-        if player1.isIA:
-            player1.learn(moves1)
-        if player2.isIA:
-            player2.learn(moves2)
+        if self.isDone() != 0:
+            if player1.isIA:
+                player1.learn(moves1)
+            if player2.isIA:
+                player2.learn(moves2)
 
 
 class Player(ABC):
@@ -129,6 +135,11 @@ class Player(ABC):
 
         self.reward = 0
 
+        self.model = Sequential()
+        self.model.add(Dense(32, activation='linear', input_shape=(10,)))
+        self.model.add(Dense(9, activation='linear'))
+        self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+
     def play(self, state):
         pass
 
@@ -136,11 +147,6 @@ class Player(ABC):
 class IA(Player):
     def __init__(self):
         Player.__init__(self)
-
-        self.model = Sequential()
-        self.model.add(Dense(32, activation='linear', input_shape=(10,)))
-        self.model.add(Dense(9, activation='linear'))
-        self.model.compile(loss='mae', optimizer='adam', metrics=['mae'])
 
         self.id = Player.id
         Player.id += 1
@@ -150,47 +156,43 @@ class IA(Player):
 
     def play(self, state):
         s = np.asarray([state])
-        count = 0
-        while 1:
-            if self.training:
-                if np.random.random() < self.eps or count > 5:
-                    while 1:
-                        choice = np.random.randint(0, 9)
-                        if state[choice + 1] == 0:
-                            break
-                else:
-                    choice = np.argmax(self.model.predict(s)[0])
+        if self.training:
+            if np.random.random() < self.eps:
+                while 1:
+                    choice = np.random.randint(0, 9)
+                    if env.state[choice] == 0:
+                        break
             else:
                 choice = np.argmax(self.model.predict(s)[0])
-            if state[choice + 1] != 0:
-                target = self.model.predict(s)[0]
-                target[choice] = -100
-                target = np.asarray([target])
-                loss = self.model.train_on_batch(s, target)
-                self.losses.append(loss[0])
-                if self.id == 1 or self.id == 2:
-                    print("[D loss: %f, reward: -10.00]" % (loss[0]))
-            else:
-                break
-            count += 1
+        else:
+            choice = np.argmax(self.model.predict(s)[0])
+        if state[choice + 1] != 0:
+            target = self.model.predict(s)[0]
+            target[choice] = -100
+            target = np.asarray([target])
+            self.model.train_on_batch(s, target)
         return choice
 
     def save(self):
         self.model.save_weights("player" + str(self.id) + ".h5")
 
     def load(self):
+        self.model = Sequential()
+        self.model.add(Dense(32, activation='linear', input_shape=(10,)))
+        self.model.add(Dense(9, activation='linear'))
+        self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
         if os.path.isfile("player" + str(self.id) + ".h5"):
             self.model.load_weights("player" + str(self.id) + ".h5")
 
     def learn(self, moves):
-        for move in moves:
-            target = self.model.predict(move[0])[0]
-            target[move[1]] = self.reward
-            target = np.asarray([target])
-            loss = self.model.train_on_batch(move[0], target)
+        if len(moves) > 0:
+            for move in moves:
+                target = self.model.predict(move[0])[0]
+                target[move[1]] = self.reward
+                target = np.asarray([target])
+                loss = self.model.train_on_batch(move[0], target)
             self.losses.append(loss[0])
-            if self.id == 1 or self.id == 2:
-                print("[D loss: %f, reward: %.2f]" % (loss[0], self.reward))
+            print("N°" + str(self.id) + " [D loss: %f, reward: %.2f]" % (loss[0], self.reward))
 
 
 class Human(Player):
@@ -220,7 +222,7 @@ class Random(Player):
     def play(self, state):
         while 1:
             choice = np.random.randint(0, 9)
-            if state[choice + 1] == 0:
+            if env.state[choice] == 0:
                 break
         return choice
 
@@ -233,23 +235,31 @@ if __name__ == '__main__':
 
     player1_1 = IA()
     player1_2 = IA()
+    player1_3 = IA()
+    player1_4 = IA()
 
     player2_1 = IA()
     player2_2 = IA()
+    player2_3 = IA()
+    player2_4 = IA()
 
     player1.load()
     player2.load()
     player1_1.load()
     player1_2.load()
+    player1_3.load()
+    player1_4.load()
     player2_1.load()
     player2_2.load()
+    player2_3.load()
+    player2_4.load()
 
     random = Random()
 
     human = Human()
 
-    player1Trainers = [player1_1, player1_2, random]
-    player2Trainers = [player2_1, player2_2, random]
+    player1Trainers = [player1_1, player1_2, player1_3, player1_4, random]
+    player2Trainers = [player2_1, player2_2, player2_3, player2_4, random]
 
     var = int(input("\nWhat to do ?\n1- Train\n2- Play"))
     if var == 1:
@@ -260,8 +270,9 @@ if __name__ == '__main__':
             for ia in player1Trainers:
                 ia.training = True
             for i in range(var2):
-                print("\nGame n°"+str(i))
-                rand = np.random.randint(0, 3)
+                print("\nGame n°" + str(i))
+                rand = np.random.randint(0, 5)
+                player1.training = True
                 env.game(player1, player1Trainers[rand])
             plt.plot(player1.losses)
             plt.show()
@@ -270,13 +281,13 @@ if __name__ == '__main__':
             for ia in player2Trainers:
                 ia.training = True
             for i in range(var2):
-                print("\nGame n°"+str(i))
-                rand = np.random.randint(0, 3)
+                print("\nGame n°" + str(i))
+                rand = np.random.randint(0, 5)
                 env.game(player2, player2Trainers[rand])
             plt.plot(player2.losses)
             plt.show()
     else:
-        var = int(input("\nWho are you ?\n1- Player 1\n2- Player 2"))
+        var = input("\nWho are you ?\n1- Player 1\n2- Player 2")
         if var == 1:
             env.game(human, player2)
         else:
@@ -286,5 +297,9 @@ if __name__ == '__main__':
     player2.save()
     player1_1.save()
     player1_2.save()
+    player1_3.save()
+    player1_4.save()
     player2_1.save()
     player2_2.save()
+    player2_3.save()
+    player2_4.save()
