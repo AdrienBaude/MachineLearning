@@ -9,14 +9,9 @@ import matplotlib.pyplot as plt
 class TicTacToe:
     def __init__(self):
         self.state = np.zeros(9)
-        self.player1 = Player()
-        self.player2 = Player()
-        self.player = Player()
-
-    def reset(self):
-        self.state = np.zeros(9)
-        self.player1 = Player()
-        self.player2 = Player()
+        self.player1 = None
+        self.player2 = None
+        self.player = None
 
     def getState(self):
         if self.player == self.player1:
@@ -64,16 +59,13 @@ class TicTacToe:
 
     def game(self, player1, player2):
 
-        self.reset()
+        self.state = np.zeros(9)
 
         self.player1 = player1
         self.player2 = player2
 
         self.player1.reward = 0
         self.player2.reward = 0
-
-        self.player1.eps *= 0.999
-        self.player2.eps *= 0.999
 
         self.player = player1
 
@@ -85,7 +77,6 @@ class TicTacToe:
         while self.isDone() == 0:
             choice = self.player.play(self.getState())
             if self.state[choice] != 0:
-                print("Stop after " + str(turnCount) + " turns !")
                 break
             if self.player == self.player1:
                 moves1.append([np.asarray([self.getState()]), choice])
@@ -108,11 +99,11 @@ class TicTacToe:
 
         if self.isDone() == 1:
             if self.player == self.player1:
-                self.player1.reward = 1
-                self.player2.reward = -1
+                self.player1.reward = 10 - turnCount
+                self.player2.reward = -5
             else:
-                self.player1.reward = -1
-                self.player2.reward = 1
+                self.player1.reward = -5
+                self.player2.reward = 10 - turnCount
 
         if self.isDone() != 0:
             if player1.isIA:
@@ -131,14 +122,11 @@ class Player(ABC):
 
         self.training = False
 
-        self.eps = 0.5
+        self.eps = 0.25
 
         self.reward = 0
 
-        self.model = Sequential()
-        self.model.add(Dense(32, activation='linear', input_shape=(10,)))
-        self.model.add(Dense(9, activation='linear'))
-        self.model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+        self.model = None
 
     def play(self, state):
         pass
@@ -233,61 +221,26 @@ if __name__ == '__main__':
     player1 = IA()
     player2 = IA()
 
-    player1_1 = IA()
-    player1_2 = IA()
-    player1_3 = IA()
-    player1_4 = IA()
-
-    player2_1 = IA()
-    player2_2 = IA()
-    player2_3 = IA()
-    player2_4 = IA()
-
     player1.load()
     player2.load()
-    player1_1.load()
-    player1_2.load()
-    player1_3.load()
-    player1_4.load()
-    player2_1.load()
-    player2_2.load()
-    player2_3.load()
-    player2_4.load()
 
     random = Random()
-
     human = Human()
-
-    player1Trainers = [player1_1, player1_2, player1_3, player1_4, random]
-    player2Trainers = [player2_1, player2_2, player2_3, player2_4, random]
 
     var = int(input("\nWhat to do ?\n1- Train\n2- Play"))
     if var == 1:
-        var = int(input("\nWho will train ?\n1- Player 1\n2- Player 2"))
-        var2 = int(input("\nNumber of games : "))
-        if var == 1:
-            player1.training = True
-            for ia in player1Trainers:
-                ia.training = True
-            for i in range(var2):
-                print("\nGame n°" + str(i))
-                rand = np.random.randint(0, 5)
-                player1.training = True
-                env.game(player1, player1Trainers[rand])
-            plt.plot(player1.losses)
-            plt.show()
-        else:
-            player2.training = True
-            for ia in player2Trainers:
-                ia.training = True
-            for i in range(var2):
-                print("\nGame n°" + str(i))
-                rand = np.random.randint(0, 5)
-                env.game(player2, player2Trainers[rand])
-            plt.plot(player2.losses)
-            plt.show()
+        var = int(input("\nNumber of games : "))
+        player1.training = True
+        player2.training = True
+        for i in range(var):
+            print("\nGame n°" + str(i))
+            env.game(player1, player2)
+        plt.plot(player1.losses)
+        plt.show()
+        plt.plot(player2.losses)
+        plt.show()
     else:
-        var = input("\nWho are you ?\n1- Player 1\n2- Player 2")
+        var = int(input("\nWho are you ?\n1- Player 1\n2- Player 2"))
         if var == 1:
             env.game(human, player2)
         else:
@@ -295,11 +248,3 @@ if __name__ == '__main__':
 
     player1.save()
     player2.save()
-    player1_1.save()
-    player1_2.save()
-    player1_3.save()
-    player1_4.save()
-    player2_1.save()
-    player2_2.save()
-    player2_3.save()
-    player2_4.save()
