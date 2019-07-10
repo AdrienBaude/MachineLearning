@@ -1,40 +1,53 @@
 # Reference https://github.com/keras-team/keras/blob/master/examples/mnist_cnn.py
 
-import time
-from keras.datasets import mnist
+# Imports --------------------------------------------------------------------------------------------------------------
+
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from keras.utils import to_categorical
+from keras.preprocessing.image import ImageDataGenerator
 import os.path
 
-start_time = time.time()
+# Preprocessing --------------------------------------------------------------------------------------------------------
 
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_train = x_train.reshape(x_train.shape[0], 28, 28, 1)
-x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
-x_train = x_train.astype('float32')
-x_test = x_test.astype('float32')
-x_train /= 255
-x_test /= 255
+datagen = ImageDataGenerator(
+    rescale=1. / 255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+	validation_split=0.2)
+	
+train_generator = datagen.flow_from_directory(directory="./data", target_size=(32, 32),
+    color_mode="rgb", class_mode="categorical", batch_size=32, subset="training")
+test_generator = datagen.flow_from_directory(directory="./data", target_size=(32, 32),
+    color_mode="rgb", class_mode="categorical", batch_size=32, subset="validation")
 
-y_train = to_categorical(y_train, 10)
-y_test = to_categorical(y_test, 10)
+# Model ----------------------------------------------------------------------------------------------------------------
 
 model = Sequential()
-model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)))
-model.add(Conv2D(64, (3, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Conv2D(32, 3, activation='relu', padding='same', input_shape=(32, 32, 3)))
+model.add(MaxPooling2D())
+model.add(Conv2D(64, 3, activation='relu', padding='same'))
+model.add(MaxPooling2D())
 model.add(Flatten())
-model.add(Dense(units=128, activation='relu'))
-model.add(Dense(units=10, activation='softmax'))
+model.add(Dense(512, activation='relu'))
+model.add(Dense(len(train_generator.class_indices), activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.summary()
+
+# Training -------------------------------------------------------------------------------------------------------------
 
 if os.path.isfile('model.h5'):
     model.load_weights("model.h5")
 else:
-    model.fit(x_train, y_train, batch_size=128, epochs=12, verbose=1, validation_data=(x_test, y_test))
+    model.fit_generator(train_generator, steps_per_epoch=train_generator.samples // train_generator.batch_size, epochs=10,
+                        validation_data=test_generator, validation_steps = test_generator.samples // test_generator.batch_size)
     model.save_weights("model.h5")
 
-print("\ntime elapsed: {:.2f}s".format(time.time() - start_time))
-score = model.evaluate(x_test, y_test, verbose=0)
+# Evaluation -----------------------------------------------------------------------------------------------------------
+
+score = model.evaluate_generator(test_generator, test_generator.samples)
 print('Accuracy: ', score[1])
